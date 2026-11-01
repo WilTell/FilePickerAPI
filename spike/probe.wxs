@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Пробный пакет: всё то же, что в таблице «Содержимое MSI» в design.md,
+     плюс пробный отказ PROBEFAIL для проверки отката неудачного обновления. -->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <Package Name="File Picker Probe (филиал $(var.Branch))"
+           Manufacturer="FilePickerAPI"
+           Version="$(var.Version)"
+           UpgradeCode="6F1C2A54-9B1E-4E37-9C55-2D3E7B1A4C01"
+           Scope="perMachine"
+           Compressed="yes">
+    <MediaTemplate EmbedCab="yes" />
+
+    <MajorUpgrade Schedule="afterInstallInitialize"
+                  DowngradeErrorMessage="Установлена более новая версия: сначала удалите продукт." />
+
+    <Upgrade Code="6F1C2A54-9B1E-4E37-9C55-2D3E7B1A4C01">
+      <UpgradeVersion Minimum="$(var.Version)" Maximum="$(var.Version)"
+                      IncludeMinimum="yes" IncludeMaximum="yes"
+                      OnlyDetect="yes" Property="SAMEVERSIONFOUND" />
+    </Upgrade>
+    <Launch Condition="Installed OR NOT SAMEVERSIONFOUND"
+            Message="Эта версия уже установлена: сначала удалите продукт." />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="InstallDir" Name="FilePickerProbe" />
+    </StandardDirectory>
+
+    <ComponentGroup Id="Everything" Directory="InstallDir">
+      <Files Include="!(bindpath.dist)\**">
+        <Exclude Files="!(bindpath.dist)\FilePickerProbe.messages.dll" />
+      </Files>
+
+      <Component Id="RunValue">
+        <RegistryValue Root="HKLM"
+                       Key="Software\Microsoft\Windows\CurrentVersion\Run"
+                       Name="FilePickerProbe"
+                       Value="&quot;[InstallDir]probe.exe&quot;"
+                       Type="string" KeyPath="yes" />
+      </Component>
+
+      <Component Id="MessageFile" Permanent="yes">
+        <File Id="MessageDll" Source="!(bindpath.dist)\FilePickerProbe.messages.dll" KeyPath="yes" />
+      </Component>
+
+      <Component Id="EventSource" Permanent="yes" Guid="0B8E3D7C-4A5F-4C2D-8E11-7A6C5B4D3E02">
+        <util:EventSource Log="Application" Name="FilePickerProbe"
+                          EventMessageFile="[#MessageDll]"
+                          SupportsErrors="yes" SupportsWarnings="yes"
+                          SupportsInformationals="yes" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <Feature Id="Main">
+      <ComponentGroupRef Id="Everything" />
+    </Feature>
+
+    <CustomAction Id="ProbeFail" Directory="InstallDir"
+                  ExeCommand="[SystemFolder]cmd.exe /c exit 1"
+                  Execute="deferred" Impersonate="no" Return="check" />
+    <InstallExecuteSequence>
+      <Custom Action="ProbeFail" Before="InstallFinalize" Condition="PROBEFAIL" />
+    </InstallExecuteSequence>
+  </Package>
+</Wix>
