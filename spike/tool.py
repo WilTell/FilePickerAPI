@@ -106,7 +106,13 @@ def ctrl_c(pid: int) -> None:
 def close_console(pid: int) -> None:
     """Закрыть окно консоли, как крестиком."""
     attach(pid)
-    win32gui.PostMessage(kernel32.GetConsoleWindow(), win32con.WM_CLOSE, 0, 0)
+    hwnd = kernel32.GetConsoleWindow()
+    print(f"console window {hwnd}", flush=True)
+    # Сам инструмент тоже в этой консоли: он не должен закрыться раньше
+    kernel32.SetConsoleCtrlHandler(None, True)
+    win32gui.PostMessage(hwnd, win32con.WM_SYSCOMMAND, win32con.SC_CLOSE, 0)
+    time.sleep(3)
+    print(f"window alive {win32gui.IsWindow(hwnd)}", flush=True)
 
 
 def dump(pid: int) -> str:

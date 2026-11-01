@@ -71,7 +71,12 @@ function Msi([string[]]$arguments, [string]$label) {
     $script:msiCount++
     $log = "$ResultsDir\msi-$('{0:d2}' -f $script:msiCount)-$label.log"
     $all = @($arguments) + @('/qn', '/norestart', '/l*v', "`"$log`"")
-    (Start-Process msiexec.exe -ArgumentList $all -Wait -PassThru).ExitCode
+    # Не -Wait: он ждёт и дочерние процессы, а Restart Manager запускает exe
+    # от msiexec, и ожидание длилось бы, пока exe работает
+    $process = Start-Process msiexec.exe -ArgumentList $all -PassThru
+    $null = $process.Handle
+    if (-not $process.WaitForExit(300000)) { throw 'msiexec не завершился за 5 минут' }
+    $process.ExitCode
 }
 function Install([string]$name, [string]$extra = '') {
     $arguments = @('/i', "`"$Packages\probe-$name.msi`"")
@@ -165,7 +170,7 @@ function Run-Basic {
         Tool type $host_.Id "`"$exe`"" | Out-Null
         WaitFor $mark 'start' | Out-Null
         Start-Sleep -Seconds 2
-        Tool close-console $host_.Id | Out-Null
+        Note 'инструмент закрытия' ((Tool close-console $host_.Id) -join ' ')
         $done = WaitFor $mark 'close_done' 10
         Check 'событие записано до возврата из обработчика' ($null -ne $done) (Kinds $mark)
         $event = Get-WinEvent -FilterHashtable @{ LogName = 'Application'; ProviderName = 'FilePickerProbe'; Id = 1001 } -MaxEvents 1 -ErrorAction SilentlyContinue
@@ -291,12 +296,13 @@ function Run-RestartManager([string]$kind) {
     Step 'запуск экземпляра' {
         $mark = Mark
         if ($kind -eq 'rm-other-user') {
+            # Экземпляр другого пользователя в том же сеансе: так устроена
+            # установка, когда администратор вводит свой пароль за оператора
             $password = "aA1!$([guid]::NewGuid())"
             $secure = ConvertTo-SecureString $password -AsPlainText -Force
             New-LocalUser probeuser -Password $secure -PasswordNeverExpires | Out-Null
-            $action = New-ScheduledTaskAction -Execute $exe
-            Register-ScheduledTask ProbeInstance -Action $action -User probeuser -Password $password | Out-Null
-            Start-ScheduledTask ProbeInstance
+            $credential = [pscredential]::new('probeuser', $secure)
+            Start-Process $exe -Credential $credential -LoadUserProfile -WorkingDirectory $env:SystemRoot | Out-Null
         } else {
             Start-Process $exe | Out-Null
         }
@@ -352,18 +358,24 @@ function Run-RestartManager([string]$kind) {
 
 function Run-Crash {
     Step 'установка' { Check 'msiexec' ((Install 'a') -eq 0) }
-    Step 'сбой процесса' {
-        Note 'WER' (Get-Service WerSvc | ForEach-Object { "$($_.Status) $($_.StartType)" })
-        $mark = Mark
-        Start-Process $exe | Out-Null
-        $start = WaitFor $mark 'start'
-        Check 'RegisterApplicationRestart' ($start.restart_result -eq 0) "hresult=$($start.restart_result)"
-        # Windows не перезапускает процессы моложе 60 секунд
-        Start-Sleep -Seconds 70
-        Tool window-crash | Out-Null
-        Start-Sleep -Seconds 90
-        Check 'после сбоя перезапуска нет' (@(Since $mark | Where-Object kind -eq 'start').Count -eq 1) (Kinds $mark)
-        Note 'процессы' (Describe-Probes)
+    foreach ($case in @(@('с флагами', ''), @('контроль без флагов', '--no-flags'))) {
+        Step "сбой процесса $($case[0])" {
+            Note 'WER' (Get-Service WerSvc | ForEach-Object { "$($_.Status) $($_.StartType)" })
+            $mark = Mark
+            if ($case[1]) { $process = Start-Process $exe -ArgumentList $case[1] -PassThru } else { $process = Start-Process $exe -PassThru }
+            $start = WaitFor $mark 'start'
+            Check 'RegisterApplicationRestart' ($start.restart_result -eq 0) "hresult=$($start.restart_result)"
+            WaitFor $mark 'window_created' | Out-Null
+            # Windows не перезапускает процессы моложе 60 секунд
+            Start-Sleep -Seconds 70
+            Tool window-crash | Out-Null
+            Check 'процесс упал' ($process.WaitForExit(15000)) (Kinds $mark)
+            Start-Sleep -Seconds 60
+            Note 'запусков' "$(@(Since $mark | Where-Object kind -eq 'start').Count)"
+            Note 'записи' (Kinds $mark)
+            Note 'процессы' (Describe-Probes)
+            Stop-Probes
+        }
     }
 }
 

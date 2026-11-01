@@ -96,7 +96,8 @@ def wndproc(hwnd: int, message: int, wparam: int, lparam: int) -> int:
         return 0
     if message == WM_APP_CRASH:
         log("crash_requested")
-        ctypes.string_at(0)
+        # ctypes перехватил бы нарушение доступа и превратил в OSError
+        ctypes.windll.kernel32.RaiseFailFastException(None, None, 0)
     return win32gui.DefWindowProc(hwnd, message, wparam, lparam)
 
 
@@ -124,7 +125,10 @@ def main() -> int:
     """Работать до команды остановки."""
     exe = win32api.GetModuleFileName(None)
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    restart_result = kernel32.RegisterApplicationRestart(None, RESTART_FLAGS)
+    # --no-flags — контрольный запуск: показывает, что проверка сбоя вообще
+    # способна заметить перезапуск
+    flags = 0 if "--no-flags" in sys.argv else RESTART_FLAGS
+    restart_result = kernel32.RegisterApplicationRestart(None, flags)
     print("probe console line stdout", flush=True)
     print("probe console line stderr", file=sys.stderr, flush=True)
     log(
