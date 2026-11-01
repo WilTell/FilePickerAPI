@@ -29,8 +29,8 @@
     </StandardDirectory>
 
     <ComponentGroup Id="Everything" Directory="InstallDir">
-      <Files Include="!(bindpath.dist)\**">
-        <Exclude Files="!(bindpath.dist)\FilePickerProbe.messages.dll" />
+      <Files Include="$(var.Dist)\**">
+        <Exclude Files="$(var.Dist)\FilePickerProbe.messages.dll" />
       </Files>
 
       <Component Id="RunValue">

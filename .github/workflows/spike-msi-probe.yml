@@ -110,9 +110,14 @@ jobs:
       run: |
         function Build($name, $version, $branch) {
           dotnet tool run wix build spike\probe.wxs -arch x64 -ext WixToolset.Util.wixext `
-            -d "Version=$version" -d "Branch=$branch" -bindpath "dist=build\pkg\$name" `
-            -o "build\pkg\probe-$name.msi"
+            -d "Version=$version" -d "Branch=$branch" -d "Dist=$PWD\build\pkg\$name" `
+            -bindpath "dist=build\pkg\$name" -o "build\pkg\probe-$name.msi"
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          # Если шаблон Files ничего не нашёл, WiX только предупреждает
+          if ((Get-Item "build\pkg\probe-$name.msi").Length -lt 1MB) {
+            Write-Output "::error::probe-$name.msi is suspiciously small"
+            exit 1
+          }
         }
         Build a 1.0.0 5400
         Build b 1.0.1 5400
