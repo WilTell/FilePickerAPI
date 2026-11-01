@@ -8,6 +8,8 @@
            Version="$(var.Version)"
            UpgradeCode="6F1C2A54-9B1E-4E37-9C55-2D3E7B1A4C01"
            Scope="perMachine"
+           Codepage="1251"
+           SummaryCodepage="1251"
            Compressed="yes">
     <MediaTemplate EmbedCab="yes" />
 
