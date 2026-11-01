@@ -156,7 +156,7 @@ jobs:
 
     - name: Run scenario
       shell: pwsh
-      run: ./spike/msi-probe.ps1 -Scenario ${{ matrix.scenario }} -Packages packages\build\pkg -ResultsDir results
+      run: ./spike/msi-probe.ps1 -Scenario ${{ matrix.scenario }} -Packages packages\pkg -ResultsDir results
 
     - name: Upload results
       if: always()
