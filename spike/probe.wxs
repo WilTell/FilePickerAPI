@@ -14,7 +14,7 @@
     <MajorUpgrade Schedule="afterInstallInitialize"
                   DowngradeErrorMessage="Установлена более новая версия: сначала удалите продукт." />
 
-    <Upgrade Code="6F1C2A54-9B1E-4E37-9C55-2D3E7B1A4C01">
+    <Upgrade Id="6F1C2A54-9B1E-4E37-9C55-2D3E7B1A4C01">
       <UpgradeVersion Minimum="$(var.Version)" Maximum="$(var.Version)"
                       IncludeMinimum="yes" IncludeMaximum="yes"
                       OnlyDetect="yes" Property="SAMEVERSIONFOUND" />
