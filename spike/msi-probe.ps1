@@ -302,7 +302,14 @@ function Run-RestartManager([string]$kind) {
             $secure = ConvertTo-SecureString $password -AsPlainText -Force
             New-LocalUser probeuser -Password $secure -PasswordNeverExpires | Out-Null
             $credential = [pscredential]::new('probeuser', $secure)
-            Start-Process $exe -Credential $credential -LoadUserProfile -WorkingDirectory $env:SystemRoot | Out-Null
+            # Через cmd: если exe упадёт, его вывод останется в файле
+            $launcher = Start-Process cmd.exe -ArgumentList "/c `"`"$exe`" > `"$logDir\other-user.txt`" 2>&1`"" `
+                -Credential $credential -LoadUserProfile -WorkingDirectory $env:SystemRoot -PassThru
+            Start-Sleep -Seconds 8
+            Note 'запуск от другого пользователя' "launcher exited=$($launcher.HasExited) code=$($launcher.ExitCode) probes=$(Describe-Probes)"
+            Copy-Item "$logDir\other-user.txt" $ResultsDir -ErrorAction SilentlyContinue
+            Note 'вывод exe' ((Get-Content "$logDir\other-user.txt" -Raw -ErrorAction SilentlyContinue) -replace '\s+', ' ')
+            & icacls.exe $logDir | Out-String | ForEach-Object { Note 'права папки журнала' ($_ -replace '\s+', ' ') }
         } else {
             Start-Process $exe | Out-Null
         }
@@ -356,6 +363,33 @@ function Run-RestartManager([string]$kind) {
     }
 }
 
+function Run-ConsoleClose {
+    Step 'установка' { Check 'msiexec' ((Install 'a') -eq 0) }
+    foreach ($use in @('type', 'bat')) {
+        Step "закрытие консоли, запуск $use" {
+            $mark = Mark
+            if ($use -eq 'type') {
+                $console = InConsole 'cmd.exe' '/k'
+                Start-Sleep -Seconds 4
+                Tool type $console.Id "`"$exe`"" | Out-Null
+            } else {
+                $bat = "$ResultsDir\close.bat"
+                Set-Content $bat "`"$exe`"" -Encoding ascii
+                $console = InConsole 'cmd.exe' "/c `"$bat`""
+            }
+            $start = WaitFor $mark 'start'
+            Note 'запущен' "console_window=$($start.console_window)"
+            Start-Sleep -Seconds 2
+            Note 'до закрытия' "probes=$(Describe-Probes) conhost=$(@(Get-Process conhost -ErrorAction SilentlyContinue).Count)"
+            Note 'инструмент' ((Tool close-console $console.Id) -join ' ')
+            Start-Sleep -Seconds 5
+            Note 'записи' (Kinds $mark)
+            Note 'после закрытия' "probes=$(Describe-Probes) cmd_exited=$($console.HasExited) conhost=$(@(Get-Process conhost -ErrorAction SilentlyContinue).Count)"
+            Stop-Probes
+        }
+    }
+}
+
 function Run-Crash {
     Step 'установка' { Check 'msiexec' ((Install 'a') -eq 0) }
     foreach ($case in @(@('с флагами', ''), @('контроль без флагов', '--no-flags'))) {
@@ -382,6 +416,7 @@ function Run-Crash {
 try {
     if ($Scenario -eq 'basic') { Run-Basic }
     elseif ($Scenario -eq 'crash') { Run-Crash }
+    elseif ($Scenario -eq 'console-close') { Run-ConsoleClose }
     else { Run-RestartManager $Scenario }
 }
 finally {

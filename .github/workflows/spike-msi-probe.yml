@@ -142,7 +142,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: [ basic, rm-admin, rm-system, rm-other-user, crash ]
+        scenario: [ rm-other-user, console-close ]
     steps:
     - uses: actions/checkout@v7
 
