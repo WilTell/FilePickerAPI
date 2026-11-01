@@ -18,7 +18,6 @@ import win32api
 import win32con
 import win32evtlog
 import win32gui
-import win32process
 from win32com.shell import shell
 
 LOG = Path(r"C:\ProgramData\FilePickerProbe\probe.jsonl")
@@ -33,10 +32,12 @@ stop = threading.Event()
 
 def identity() -> dict[str, object]:
     """Вернуть, кто и где работает."""
+    session = ctypes.c_ulong()
+    ctypes.windll.kernel32.ProcessIdToSessionId(os.getpid(), ctypes.byref(session))
     return {
         "pid": os.getpid(),
         "user": win32api.GetUserNameEx(win32con.NameSamCompatible),
-        "session": win32process.ProcessIdToSessionId(os.getpid()),
+        "session": session.value,
     }
 
 

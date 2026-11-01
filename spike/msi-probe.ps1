@@ -133,13 +133,13 @@ function Run-Basic {
         Check 'WM_CLOSE останавливает' ($process.WaitForExit(15000)) (Kinds $mark)
     }
 
-    foreach ($shell in @(@('cmd', 'cmd.exe', '/k'), @('PowerShell', 'powershell.exe', '-NoExit -NoLogo -NoProfile'))) {
+    foreach ($shell in @(@('cmd', 'cmd.exe', '/k', ''), @('PowerShell', 'powershell.exe', '-NoExit -NoLogo -NoProfile', '& '))) {
         Step "1.5 интерактивный $($shell[0])" {
             $marker = "$ResultsDir\marker-$($shell[0]).txt"
             $host_ = InConsole $shell[1] $shell[2]
             Start-Sleep -Seconds 4
             $mark = Mark
-            Tool type $host_.Id "`"$exe`"" | Out-Null
+            Tool type $host_.Id "$($shell[3])`"$exe`"" | Out-Null
             $start = WaitFor $mark 'start'
             Check 'exe запущен из консоли' ($null -ne $start) "console_window=$($start.console_window) stdout=$($start.stdout)"
             Start-Sleep -Seconds 2
