@@ -129,6 +129,10 @@ def main() -> int:
     # способна заметить перезапуск
     flags = 0 if "--no-flags" in sys.argv else RESTART_FLAGS
     restart_result = kernel32.RegisterApplicationRestart(None, flags)
+    try:
+        local_appdata = shell.SHGetKnownFolderPath(shell.FOLDERID_LocalAppData, 0, 0)
+    except Exception as error:  # noqa: BLE001 - проба: нужен сам факт отказа
+        local_appdata = f"ERROR {error!r}"
     print("probe console line stdout", flush=True)
     print("probe console line stderr", file=sys.stderr, flush=True)
     log(
@@ -138,7 +142,7 @@ def main() -> int:
         version=file_version(exe),
         console_window=kernel32.GetConsoleWindow() != 0,
         stdout=str(sys.stdout),
-        local_appdata=shell.SHGetKnownFolderPath(shell.FOLDERID_LocalAppData, 0, 0),
+        local_appdata=local_appdata,
         restart_result=restart_result,
     )
     win32api.SetConsoleCtrlHandler(console_handler, True)
